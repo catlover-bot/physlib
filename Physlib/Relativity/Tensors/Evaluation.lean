@@ -190,8 +190,91 @@ lemma evalT_permT {n m : ℕ} {c : Fin (n + 1) → C} {c' : Fin (m + 1) → C}
 
 -/
 
-TODO "Add the lemma corresponding the the commutation of two evaluations of tensor
-  indices."
+set_option backward.isDefEq.respectTransparency false in
+/-- Evaluating two tensor indices commutes, up to the canonical reindexing
+identifying the two possible orders in which the indices are removed. -/
+lemma evalT_evalT
+    {n : ℕ}
+    {c : Fin (n + 1 + 1) → C}
+    (k1 : Fin (n + 1 + 1))
+    (k2 : Fin (n + 1))
+    (φ1 : basisIdx (c k1))
+    (φ2 : basisIdx ((c ∘ k1.succAbove) k2))
+    (t : Tensor S c) :
+    evalT k2 φ2 (evalT k1 φ1 t) =
+      permT id
+        (IsReindexing.succAbove_succAbove_comm k1 k2)
+        (evalT
+          (k2.predAbove k1)
+          (basisIdxCongr
+            (congrArg c
+              (Fin.succAbove_succAbove_predAbove k1 k2).symm) φ1)
+          (evalT (k1.succAbove k2) φ2 t)) := by
+
+  induction' t using Tensor.induction_on_basis with
+      b a t hb t1 t2 hb1 hb2
+
+  · simp only [evalT_basis, apply_ite, map_zero]
+
+    have hk1 :
+        (k1.succAbove k2).succAbove (k2.predAbove k1) = k1 :=
+      Fin.succAbove_succAbove_predAbove k1 k2
+
+    have hcond :
+        (b ((k1.succAbove k2).succAbove (k2.predAbove k1)) =
+            basisIdxCongr
+              (congrArg c hk1.symm)
+              φ1)
+          ↔
+        (b k1 = φ1) := by
+      rw [ComponentIdx.congr_right b _ k1 hk1]
+      exact (basisIdxCongr _).apply_eq_iff_eq
+
+    by_cases h2 : b (k1.succAbove k2) = φ2
+
+    · by_cases h1 : b k1 = φ1
+
+      · have htr :
+            b ((k1.succAbove k2).succAbove (k2.predAbove k1)) =
+              basisIdxCongr
+                (congrArg c hk1.symm)
+                φ1 :=
+          hcond.mpr h1
+
+        simp only [h2, h1, htr, ↓reduceIte]
+
+        rw [permT_basis]
+
+        congr 1
+
+        funext i
+
+        have hi :
+            (k1.succAbove k2).succAbove
+                ((k2.predAbove k1).succAbove i) =
+              k1.succAbove (k2.succAbove i) :=
+          Fin.succAbove_succAbove_succAbove_predAbove k1 k2 i
+
+        exact ComponentIdx.congr_right b _ _ hi.symm
+
+      · have hntr :
+            ¬ b ((k1.succAbove k2).succAbove (k2.predAbove k1)) =
+                basisIdxCongr
+                  (congrArg c hk1.symm)
+                  φ1 := by
+          intro htr
+          exact h1 (hcond.mp htr)
+
+        simp only [h2, h1, hntr, ↓reduceIte]
+
+    · simp only [h2, ↓reduceIte, ite_self]
+
+  · simp
+
+  · simp only [map_smul, hb]
+
+  · simp only [map_add, hb1, hb2]
+
 
 /-!
 
@@ -249,8 +332,317 @@ lemma contrT_evalT {n : ℕ} {c : Fin (n + 1 + 1 + 1) → C}
   · simp only [map_smul, hb]
   · simp only [map_add, hb1, hb2]
 
-TODO "Add a lemma similar to `contrT_evalT` except with the contraction and
-  evaluation the other way around."
+set_option backward.isDefEq.respectTransparency false in
+/-- Evaluating an index after contraction commutes with first evaluating the
+corresponding original index and then contracting the two residual indices, up to
+the canonical identity reindexing. -/
+lemma evalT_contrT
+    {n : ℕ}
+    {c : Fin (n + 1 + 1 + 1) → C}
+    (i j : Fin (n + 1 + 1 + 1))
+    (k : Fin (n + 1))
+    (φ : basisIdx ((c ∘ i.succSuccAbove j) k))
+    (hij : i ≠ j ∧ S.τ (c i) = c j)
+    (t : Tensor S c) :
+    evalT k φ (contrT (n + 1) i j hij t) =
+      permT id
+        (IsReindexing.succSuccAbove_succAbove_comm k i j)
+        (contrT n
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i)
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j)
+          (by
+            let kp : Fin (n + 1 + 1 + 1) :=
+              i.succSuccAbove j k
+
+            let km : Fin (n + 1 + 1) :=
+              Fin.predAbove 0 kp
+
+            let ip : Fin (n + 1 + 1) :=
+              km.predAbove i
+
+            let jp : Fin (n + 1 + 1) :=
+              km.predAbove j
+
+            have hi_ne : i ≠ kp := by
+              simp [kp]
+
+            have hj_ne : j ≠ kp := by
+              simp [kp]
+
+            have hi : kp.succAbove ip = i := by
+              dsimp [ip, km]
+
+              rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+
+              · rw [h0]
+                exact Fin.succAbove_predAbove
+                  (by simpa [h0] using hi_ne)
+
+              · rw [hq, Fin.predAbove_zero_succ]
+                exact Fin.succ_succAbove_predAbove
+                  (by simpa [hq] using hi_ne)
+
+            have hj : kp.succAbove jp = j := by
+              dsimp [jp, km]
+
+              rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+
+              · rw [h0]
+                exact Fin.succAbove_predAbove
+                  (by simpa [h0] using hj_ne)
+
+              · rw [hq, Fin.predAbove_zero_succ]
+                exact Fin.succ_succAbove_predAbove
+                  (by simpa [hq] using hj_ne)
+
+            constructor
+
+            · intro hipjp
+
+              apply hij.1
+
+              calc
+                i = kp.succAbove ip := hi.symm
+                _ = kp.succAbove jp :=
+                  congrArg kp.succAbove hipjp
+                _ = j := hj
+
+            · show
+                S.τ (c (kp.succAbove ip)) =
+                  c (kp.succAbove jp)
+
+              rw [hi, hj]
+
+              exact hij.2)
+          (evalT (i.succSuccAbove j k) φ t)) := by
+  induction' t using Tensor.induction_on_basis with
+      b a t hb t1 t2 hb1 hb2
+
+  · have hi :
+        (i.succSuccAbove j k).succAbove
+            ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i) =
+          i := by
+
+      let kp : Fin (n + 1 + 1 + 1) :=
+        i.succSuccAbove j k
+
+      change
+        kp.succAbove ((Fin.predAbove 0 kp).predAbove i) = i
+
+      have hi_ne : i ≠ kp := by
+        simp [kp]
+
+      rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+
+      · rw [h0]
+        exact Fin.succAbove_predAbove
+          (by simpa [h0] using hi_ne)
+
+      · rw [hq, Fin.predAbove_zero_succ]
+        exact Fin.succ_succAbove_predAbove
+          (by simpa [hq] using hi_ne)
+
+    have hj :
+        (i.succSuccAbove j k).succAbove
+            ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j) =
+          j := by
+
+      let kp : Fin (n + 1 + 1 + 1) :=
+        i.succSuccAbove j k
+
+      change
+        kp.succAbove ((Fin.predAbove 0 kp).predAbove j) = j
+
+      have hj_ne : j ≠ kp := by
+        simp [kp]
+
+      rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+
+      · rw [h0]
+        exact Fin.succAbove_predAbove
+          (by simpa [h0] using hj_ne)
+
+      · rw [hq, Fin.predAbove_zero_succ]
+        exact Fin.succ_succAbove_predAbove
+          (by simpa [hq] using hj_ne)
+
+    have hidx :
+        ∀ m : Fin n,
+          (i.succSuccAbove j k).succAbove
+              (((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i).succSuccAbove
+                ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j) m) =
+            i.succSuccAbove j (k.succAbove m) := by
+
+      intro m
+      apply Fin.val_injective
+
+      simp only [
+        Fin.succSuccAbove,
+        Fin.succAbove,
+        Fin.predAbove,
+        Fin.lt_def,
+        Fin.val_castSucc,
+        Fin.val_succ,
+        Fin.castPred,
+        apply_ite Fin.val
+      ]
+
+      grind (splits := 60)
+
+    simp only [
+      contrT_basis,
+      map_smul,
+      evalT_basis,
+      apply_ite,
+      map_zero
+    ]
+
+    simp only [ComponentIdx.dropPair]
+
+    by_cases hφ :
+        b (i.succSuccAbove j k) = φ
+
+    · simp only [hφ, ↓reduceIte]
+
+      rw [permT_basis]
+
+      congr 1
+
+      · let kp : Fin (n + 1 + 1 + 1) :=
+          i.succSuccAbove j k
+
+        let ip : Fin (n + 1 + 1) :=
+          (Fin.predAbove 0 kp).predAbove i
+
+        let jp : Fin (n + 1 + 1) :=
+          (Fin.predAbove 0 kp).predAbove j
+
+        have hi' : kp.succAbove ip = i := by
+          simpa only [kp, ip] using hi
+
+        have hj' : kp.succAbove jp = j := by
+          simpa only [kp, jp] using hj
+
+        have hijShort :
+            ip ≠ jp ∧
+              S.τ ((c ∘ kp.succAbove) ip) =
+                (c ∘ kp.succAbove) jp := by
+
+          constructor
+
+          · intro hipjp
+
+            apply hij.1
+
+            calc
+              i = kp.succAbove ip := hi'.symm
+              _ = kp.succAbove jp :=
+                congrArg kp.succAbove hipjp
+              _ = j := hj'
+
+          · simp only [Function.comp_apply]
+
+            rw [hi', hj']
+
+            exact hij.2
+
+        have hijEmbedded :
+            kp.succAbove ip ≠ kp.succAbove jp ∧
+              S.τ (c (kp.succAbove ip)) =
+                c (kp.succAbove jp) := by
+
+          constructor
+
+          · intro h
+            exact
+              hijShort.1
+                (Fin.succAbove_right_injective h)
+
+          · simpa only [Function.comp_apply]
+              using hijShort.2
+
+        -- Removing the evaluated slot from the basis vector simply
+        -- restricts the original pure basis vector along `kp.succAbove`.
+        -- Hence the corresponding contraction coefficient is
+        -- definitionally the coefficient at the embedded pair.
+        have hdrop :
+            Pure.contrPCoeff
+                ip
+                jp
+                hijShort
+                (Pure.basisVector
+                  (c ∘ kp.succAbove)
+                  (fun m => b (kp.succAbove m))) =
+              Pure.contrPCoeff
+                (kp.succAbove ip)
+                (kp.succAbove jp)
+                hijEmbedded
+                (Pure.basisVector c b) := by
+          rfl
+
+        change
+          Pure.contrPCoeff
+              i
+              j
+              hij
+              (Pure.basisVector c b) =
+            Pure.contrPCoeff
+              ip
+              jp
+              hijShort
+              (Pure.basisVector
+                (c ∘ kp.succAbove)
+                (fun m => b (kp.succAbove m)))
+
+        calc
+          Pure.contrPCoeff
+              i
+              j
+              hij
+              (Pure.basisVector c b) =
+            Pure.contrPCoeff
+              (kp.succAbove ip)
+              (kp.succAbove jp)
+              hijEmbedded
+              (Pure.basisVector c b) := by
+
+                exact
+                  Pure.contrPCoeff_congr
+                    (Pure.basisVector c b)
+                    hi'.symm
+                    hj'.symm
+
+          _ =
+            Pure.contrPCoeff
+              ip
+              jp
+              hijShort
+              (Pure.basisVector
+                (c ∘ kp.succAbove)
+                (fun m => b (kp.succAbove m))) :=
+              hdrop.symm
+
+      · congr 1
+        funext m
+
+        simp only [
+          ComponentIdx.dropPair,
+          id_eq
+        ]
+
+        exact
+          ComponentIdx.congr_right b _ _
+            (hidx m).symm
+
+    · simp [hφ]
+
+  · simp
+
+  · simp only [map_smul, hb]
+
+  · simp only [map_add, hb1, hb2]
+
+
 
 /-!
 
