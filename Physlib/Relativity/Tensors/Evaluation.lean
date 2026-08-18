@@ -60,6 +60,20 @@ lemma evalPCoeff_basisVector (i : Fin (n + 1)) (φ : basisIdx (c i)) (b' : Compo
     evalPCoeff i φ (Pure.basisVector c b') = if b' i = φ then (1 : k) else 0 := by
   simp [evalPCoeff, basisVector, Finsupp.single_apply]
 
+/-- Evaluating a coefficient after dropping a pair is the same as evaluating
+the corresponding embedded slot of the original pure tensor. -/
+lemma evalPCoeff_dropPair
+    {n : ℕ}
+    {c : Fin (n + 1 + 1 + 1) → C}
+    (i j : Fin (n + 1 + 1 + 1))
+    (hij : i ≠ j)
+    (k : Fin (n + 1))
+    (φ : basisIdx ((c ∘ i.succSuccAbove j) k))
+    (p : Pure S c) :
+    evalPCoeff k φ (dropPair i j hij p) =
+      evalPCoeff (i.succSuccAbove j k) φ p := by
+  rfl
+
 /-!
 
 ## Evaluation for a pure tensor.

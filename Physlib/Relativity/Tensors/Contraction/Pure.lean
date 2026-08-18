@@ -81,6 +81,31 @@ lemma dropPair_comm {n : ℕ} {c : Fin (n + 1 + 1 + 1 + 1) → C}
   · simp [hij1]
   · simp [hij2]
 
+/-- Dropping a pair and then another slot agrees, up to the canonical
+reindexing, with dropping that slot first and then the residual pair. -/
+lemma dropPair_drop
+    {n : ℕ}
+    {c : Fin (n + 1 + 1 + 1) → C}
+    (i j : Fin (n + 1 + 1 + 1))
+    (hij : i ≠ j)
+    (k : Fin (n + 1))
+    (hipjp :
+      ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i) ≠
+        ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j))
+    (p : Pure S c) :
+    (p.dropPair i j hij).drop k =
+      permP id
+        (IsReindexing.succSuccAbove_succAbove_comm k i j)
+        ((p.drop (i.succSuccAbove j k)).dropPair
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i)
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j)
+          hipjp) := by
+  funext m
+  simp only [drop, dropPair, permP, id_eq, Function.comp_apply]
+  exact
+    (Pure.congr_right p _ _
+      (Fin.succSuccAbove_succAbove_comm_apply i j k m).symm).symm
+
 @[simp]
 lemma dropPair_update_fst {n : ℕ} [inst : DecidableEq (Fin (n + 1 +1))] {c : Fin (n + 1 + 1) → C}
     (i j : Fin (n + 1 + 1)) (hij : i ≠ j) (p : Pure S c)
@@ -282,6 +307,26 @@ lemma contrPCoeff_update_snd_smul {n : ℕ} [inst : DecidableEq (Fin n)] {c : Fi
   repeat rw [Pure.update_diff]
   simp only [smul_eq_mul]
   all_goals grind
+
+/-- Contracting two slots after dropping another slot is the same coefficient
+as contracting the corresponding embedded slots of the original pure tensor. -/
+lemma contrPCoeff_drop
+    {n : ℕ}
+    {c : Fin (n + 1 + 1 + 1) → C}
+    (kp : Fin (n + 1 + 1 + 1))
+    (ip jp : Fin (n + 1 + 1))
+    (hij :
+      ip ≠ jp ∧
+        S.τ ((c ∘ kp.succAbove) ip) =
+          (c ∘ kp.succAbove) jp)
+    (p : Pure S c) :
+    contrPCoeff ip jp hij (p.drop kp) =
+      contrPCoeff
+        (kp.succAbove ip)
+        (kp.succAbove jp)
+        (by simpa using hij)
+        p := by
+  rfl
 
 lemma contrPCoeff_dropPair {n : ℕ} {c : Fin (n + 1 + 1) → C}
     (a b : Fin (n + 1 + 1)) (hab : a ≠ b)
