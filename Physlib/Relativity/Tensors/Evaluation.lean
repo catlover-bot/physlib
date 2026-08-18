@@ -263,8 +263,192 @@ lemma contrT_evalT {n : ℕ} {c : Fin (n + 1 + 1 + 1) → C}
   · simp only [map_smul, hb]
   · simp only [map_add, hb1, hb2]
 
-TODO "Add a lemma similar to `contrT_evalT` except with the contraction and
-  evaluation the other way around."
+private lemma succAbove_predAbove_zero_predAbove
+    {n : ℕ} (kp i : Fin (n + 1 + 1 + 1)) (hi : i ≠ kp) :
+    kp.succAbove ((Fin.predAbove 0 kp).predAbove i) = i := by
+  rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+  · subst kp
+    exact Fin.succAbove_predAbove hi
+  · subst kp
+    rw [Fin.predAbove_zero_succ]
+    exact Fin.succ_succAbove_predAbove hi
+
+private lemma evalT_contrT_residual_hij
+    {n : ℕ} {c : Fin (n + 1 + 1 + 1) → C}
+    (kp i j : Fin (n + 1 + 1 + 1))
+    (hi : i ≠ kp) (hj : j ≠ kp)
+    (hij : i ≠ j ∧ S.τ (c i) = c j) :
+    let ip : Fin (n + 1 + 1) :=
+      (Fin.predAbove 0 kp).predAbove i
+    let jp : Fin (n + 1 + 1) :=
+      (Fin.predAbove 0 kp).predAbove j
+    ip ≠ jp ∧
+      S.τ ((c ∘ kp.succAbove) ip) =
+        (c ∘ kp.succAbove) jp := by
+  dsimp only
+  have hi' :
+      kp.succAbove ((Fin.predAbove 0 kp).predAbove i) = i :=
+    succAbove_predAbove_zero_predAbove kp i hi
+  have hj' :
+      kp.succAbove ((Fin.predAbove 0 kp).predAbove j) = j :=
+    succAbove_predAbove_zero_predAbove kp j hj
+  constructor
+  · intro hipjp
+    apply hij.1
+    calc
+      i = kp.succAbove ((Fin.predAbove 0 kp).predAbove i) := hi'.symm
+      _ = kp.succAbove ((Fin.predAbove 0 kp).predAbove j) :=
+        congrArg kp.succAbove hipjp
+      _ = j := hj'
+  · simp only [Function.comp_apply]
+    rw [hi', hj']
+    exact hij.2
+
+private lemma evalT_contrT_contrPCoeff_pure
+    {n : ℕ} {c : Fin (n + 1 + 1 + 1) → C}
+    (i j : Fin (n + 1 + 1 + 1))
+    (k : Fin (n + 1))
+    (hij : i ≠ j ∧ S.τ (c i) = c j)
+    (p : Pure S c) :
+    Pure.contrPCoeff i j hij p =
+      Pure.contrPCoeff
+        ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i)
+        ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j)
+        (evalT_contrT_residual_hij
+          (S := S) (i.succSuccAbove j k) i j
+          (by simp) (by simp) hij)
+        (p.drop (i.succSuccAbove j k)) := by
+  symm
+  rw [Pure.contrPCoeff_drop]
+  apply Pure.contrPCoeff_congr p
+  · exact succAbove_predAbove_zero_predAbove
+      (i.succSuccAbove j k) i (by simp)
+  · exact succAbove_predAbove_zero_predAbove
+      (i.succSuccAbove j k) j (by simp)
+
+private lemma evalT_contrT_pure
+    {n : ℕ} {c : Fin (n + 1 + 1 + 1) → C}
+    (i j : Fin (n + 1 + 1 + 1))
+    (k : Fin (n + 1))
+    (φ : basisIdx ((c ∘ i.succSuccAbove j) k))
+    (hij : i ≠ j ∧ S.τ (c i) = c j)
+    (p : Pure S c) :
+    evalT k φ (contrT (n + 1) i j hij p.toTensor) =
+      permT id
+        (IsReindexing.succSuccAbove_succAbove_comm k i j)
+        (contrT n
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i)
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j)
+          (evalT_contrT_residual_hij
+            (S := S) (i.succSuccAbove j k) i j
+            (by simp) (by simp) hij)
+          (evalT (i.succSuccAbove j k) φ p.toTensor)) := by
+  simp only [
+    contrT_pure,
+    Pure.contrP,
+    map_smul,
+    evalT_pure,
+    Pure.evalP,
+    permT_pure
+  ]
+  rw [
+    Pure.evalPCoeff_dropPair,
+    evalT_contrT_contrPCoeff_pure
+  ]
+  have hipjp :
+      ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i) ≠
+        ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j) :=
+    (evalT_contrT_residual_hij
+      (S := S) (i.succSuccAbove j k) i j
+      (by simp) (by simp) hij).1
+  rw [
+    Pure.dropPair_drop
+      (S := S) i j hij.1 k hipjp p
+  ]
+  simp only [smul_smul]
+  congr 1
+  exact mul_comm _ _
+
+/-- Evaluating a tensor index commutes with contraction, up to the canonical
+reindexing of the remaining indices. -/
+lemma evalT_contrT
+    {n : ℕ} {c : Fin (n + 1 + 1 + 1) → C}
+    (i j : Fin (n + 1 + 1 + 1))
+    (k : Fin (n + 1))
+    (φ : basisIdx ((c ∘ i.succSuccAbove j) k))
+    (hij : i ≠ j ∧ S.τ (c i) = c j)
+    (t : Tensor S c) :
+    evalT k φ (contrT (n + 1) i j hij t) =
+      permT id
+        (IsReindexing.succSuccAbove_succAbove_comm k i j)
+        (contrT n
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i)
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j)
+          (by
+            let kp : Fin (n + 1 + 1 + 1) :=
+              i.succSuccAbove j k
+            let km : Fin (n + 1 + 1) :=
+              Fin.predAbove 0 kp
+            let ip : Fin (n + 1 + 1) :=
+              km.predAbove i
+            let jp : Fin (n + 1 + 1) :=
+              km.predAbove j
+            have hi_ne : i ≠ kp := by
+              simp [kp]
+            have hj_ne : j ≠ kp := by
+              simp [kp]
+            have hi : kp.succAbove ip = i := by
+              dsimp [ip, km]
+              rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+              · rw [h0]
+                exact Fin.succAbove_predAbove
+                  (by simpa [h0] using hi_ne)
+              · rw [hq, Fin.predAbove_zero_succ]
+                exact Fin.succ_succAbove_predAbove
+                  (by simpa [hq] using hi_ne)
+            have hj : kp.succAbove jp = j := by
+              dsimp [jp, km]
+              rcases kp.eq_zero_or_eq_succ with h0 | ⟨q, hq⟩
+              · rw [h0]
+                exact Fin.succAbove_predAbove
+                  (by simpa [h0] using hj_ne)
+              · rw [hq, Fin.predAbove_zero_succ]
+                exact Fin.succ_succAbove_predAbove
+                  (by simpa [hq] using hj_ne)
+            constructor
+            · intro hipjp
+              apply hij.1
+              calc
+                i = kp.succAbove ip := hi.symm
+                _ = kp.succAbove jp :=
+                  congrArg kp.succAbove hipjp
+                _ = j := hj
+            · show
+                S.τ (c (kp.succAbove ip)) =
+                  c (kp.succAbove jp)
+              rw [hi, hj]
+              exact hij.2)
+          (evalT (i.succSuccAbove j k) φ t)) := by
+  let P (t : Tensor S c) : Prop :=
+    evalT k φ (contrT (n + 1) i j hij t) =
+      permT id
+        (IsReindexing.succSuccAbove_succAbove_comm k i j)
+        (contrT n
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove i)
+          ((Fin.predAbove 0 (i.succSuccAbove j k)).predAbove j)
+          (evalT_contrT_residual_hij
+            (S := S) (i.succSuccAbove j k) i j
+            (by simp) (by simp) hij)
+          (evalT (i.succSuccAbove j k) φ t))
+  change P t
+  apply induction_on_pure
+  · intro p
+    exact evalT_contrT_pure
+      (S := S) i j k φ hij p
+  · intro r t ht
+    simp_all [P]
+  · intro t1 t2 ht1 ht2
+    simp_all [P]
 
 /-!
 

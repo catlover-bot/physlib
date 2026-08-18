@@ -64,7 +64,7 @@ Requirements:
 
   - description: "The API contains the evaluation of one index of a tensor at a fixed basis label, its components in the basis, its commutation with permutations, contractions and products, and the reconstruction of a tensor as the sum over basis labels of the evaluations of its last index, each tensored with the matching rank-one basis tensor and permuted back into the last slot."
     done: true
-    location: "Physlib/Relativity/Tensors/Evaluation.lean (Pure.evalPCoeff, Pure.evalP, Pure.evalPMultilinear, evalT, evalT_basis, evalT_permT, contrT_evalT, evalT_prodT_right, eq_sum_evalT, ext_of_evalT)"
+    location: "Physlib/Relativity/Tensors/Evaluation.lean (Pure.evalPCoeff, Pure.evalP, Pure.evalPMultilinear, evalT, evalT_basis, evalT_permT, contrT_evalT, evalT_contrT, evalT_prodT_right, eq_sum_evalT, ext_of_evalT)"
 
   - description: "The API contains explicit constructors of tensors from vectors, from elements of a tensor product of two or three carriers, and from invariant maps, together with tensors specified by integer or rational components in the standard basis."
     done: true
